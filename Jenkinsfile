@@ -45,9 +45,9 @@ pipeline {
             steps {
                 sh '''
                     echo "=== Docker version ==="
-                    docker --version
-                    echo "=== Docker Compose version ==="
-                    docker compose version
+                    docker --version || { echo "ERROR: Docker not found. Restart Jenkins with: -v //var/run/docker.sock:/var/run/docker.sock"; exit 1; }
+                    echo "=== Docker Compose ==="
+                    docker compose version 2>/dev/null || docker-compose --version 2>/dev/null || echo "WARNING: docker compose plugin not found"
                     echo "=== Workspace ==="
                     pwd && ls -la
                 '''
@@ -130,10 +130,11 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    docker compose -p "${COMPOSE_PROJECT_NAME}" down --remove-orphans || true
-                    docker compose -p "${COMPOSE_PROJECT_NAME}" up -d
+                    DC="docker compose"
+                    $DC -p "${COMPOSE_PROJECT_NAME}" down --remove-orphans || true
+                    $DC -p "${COMPOSE_PROJECT_NAME}" up -d
                     sleep 5
-                    docker compose -p "${COMPOSE_PROJECT_NAME}" ps
+                    $DC -p "${COMPOSE_PROJECT_NAME}" ps
                 '''
             }
         }
@@ -177,7 +178,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker compose -p "${COMPOSE_PROJECT_NAME}" logs --no-color > docker-compose.log 2>&1 || true'
+            sh 'docker compose -p autovision logs --no-color > docker-compose.log 2>&1 || true'
             archiveArtifacts artifacts: 'docker-compose.log', allowEmptyArchive: true
         }
         success {
@@ -186,9 +187,9 @@ pipeline {
         failure {
             sh '''
                 echo "=== Backend logs ==="
-                docker compose -p "${COMPOSE_PROJECT_NAME}" logs --tail=50 backend  || true
+                docker compose -p autovision logs --tail=50 backend  || true
                 echo "=== Frontend logs ==="
-                docker compose -p "${COMPOSE_PROJECT_NAME}" logs --tail=50 frontend || true
+                docker compose -p autovision logs --tail=50 frontend || true
             '''
         }
     }
