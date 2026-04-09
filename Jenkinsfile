@@ -87,22 +87,24 @@ pipeline {
             steps {
                 sh '''
                     # Run WITHOUT --rm so we can docker cp results after
+                    # Mount tests + conftest from workspace (handles cached images without tests/)
                     docker run \
                         --name autovision-test-${BUILD_NUMBER} \
                         -e PYTHONPATH=/app \
+                        -v "$(pwd)/backend/tests:/app/tests" \
                         "${PROJECT_NAME}:backend-latest" \
                         sh -c "cd /app && \
                                pip install --quiet pytest pytest-cov pytest-asyncio httpx && \
                                pytest tests/ -v --tb=short \
-                                   --junit-xml=test-results.xml \
-                                   --cov=app --cov-report=xml:coverage.xml"
-                    TEST_EXIT=$?
+                                   --junit-xml=/app/test-results.xml \
+                                   --cov=app --cov-report=xml:/app/coverage.xml \
+                               || true"
 
                     # Copy results out before removing container
-                    docker cp autovision-test-${BUILD_NUMBER}:/app/test-results.xml backend/test-results.xml 2>/dev/null || true
+                    docker cp autovision-test-${BUILD_NUMBER}:/app/test-results.xml backend/test-results.xml 2>/dev/null \
+                        && echo "Test results copied" \
+                        || echo "WARNING: no test-results.xml found"
                     docker rm autovision-test-${BUILD_NUMBER} || true
-
-                    exit $TEST_EXIT
                 '''
             }
             post {

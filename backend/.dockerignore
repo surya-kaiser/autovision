@@ -17,8 +17,7 @@ venv/
 env/
 ENV/
 
-# Tests and coverage
-tests/
+# Tests and coverage (keep tests/ in image for CI)
 .pytest_cache/
 htmlcov/
 .coverage
