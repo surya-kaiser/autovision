@@ -127,19 +127,26 @@ pipeline {
         }
 
         // ── Stage 5: Lint (non-blocking) ─────────────────────────────────────
+        // Use docker cp (no -v mounts — Jenkins runs inside Docker, host can't resolve paths)
+        // Use python -m flake8 so PATH doesn't matter
         stage('Lint') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
-                        docker run --rm \
-                            -v "$(pwd)/backend/app:/app/app:ro" \
-                            -w /app \
-                            "${PROJECT_NAME}:backend-latest" \
+                        docker run -d --name autovision-lint-${BUILD_NUMBER} \
+                            "${PROJECT_NAME}:backend-latest" tail -f /dev/null
+
+                        docker cp backend/app/. autovision-lint-${BUILD_NUMBER}:/app/app/
+
+                        docker exec autovision-lint-${BUILD_NUMBER} \
                             sh -c "pip install --quiet flake8 && \
-                                   flake8 app/ \
+                                   python -m flake8 /app/app/ \
                                        --max-line-length=120 \
                                        --extend-ignore=E203,W503,E501 \
                                        --exclude=__pycache__"
+
+                        docker stop autovision-lint-${BUILD_NUMBER} || true
+                        docker rm autovision-lint-${BUILD_NUMBER} || true
                     '''
                 }
             }
