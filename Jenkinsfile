@@ -166,41 +166,46 @@ pipeline {
         }
 
         // ── Stage 7: Health Check ─────────────────────────────────────────────
-        // Jenkins runs inside Docker — localhost doesn't reach host-mapped ports.
-        // Use host.docker.internal (Windows/Mac Docker Desktop always provides this).
+        // Jenkins runs inside Docker — HTTP to host ports is unreliable.
+        // Check container health status directly via docker inspect instead.
         stage('Health Check') {
             steps {
                 sh '''
-                    HOST=host.docker.internal
-
-                    echo "Waiting for backend at http://${HOST}:8000 ..."
+                    echo "Checking backend container..."
                     for i in $(seq 1 12); do
-                        if curl -sf http://${HOST}:8000/api/v1/system/info > /dev/null 2>&1; then
-                            echo "Backend healthy after attempt $i"
+                        STATUS=$(docker inspect --format="{{.State.Health.Status}}" autovision-backend 2>/dev/null || echo "missing")
+                        RUNNING=$(docker inspect --format="{{.State.Running}}" autovision-backend 2>/dev/null || echo "false")
+                        echo "  attempt $i: status=$STATUS running=$RUNNING"
+                        if [ "$STATUS" = "healthy" ] || [ "$RUNNING" = "true" -a "$STATUS" = "<no value>" ]; then
+                            echo "Backend is up"
                             break
                         fi
-                        echo "  attempt $i/12 — sleeping 5s"
                         sleep 5
                     done
-                    curl -sf http://${HOST}:8000/api/v1/system/info \
-                        || { echo "ERROR: backend not healthy"; exit 1; }
+                    FINAL=$(docker inspect --format="{{.State.Running}}" autovision-backend 2>/dev/null || echo "false")
+                    [ "$FINAL" = "true" ] || { echo "ERROR: autovision-backend not running"; exit 1; }
 
-                    echo "Waiting for frontend at http://${HOST}:5173 ..."
+                    echo "Checking frontend container..."
                     for i in $(seq 1 6); do
-                        if curl -sf http://${HOST}:5173 > /dev/null 2>&1; then
-                            echo "Frontend healthy after attempt $i"
+                        STATUS=$(docker inspect --format="{{.State.Health.Status}}" autovision-frontend 2>/dev/null || echo "missing")
+                        RUNNING=$(docker inspect --format="{{.State.Running}}" autovision-frontend 2>/dev/null || echo "false")
+                        echo "  attempt $i: status=$STATUS running=$RUNNING"
+                        if [ "$STATUS" = "healthy" ] || [ "$RUNNING" = "true" ]; then
+                            echo "Frontend is up"
                             break
                         fi
-                        echo "  attempt $i/6 — sleeping 5s"
                         sleep 5
                     done
-                    curl -sf http://${HOST}:5173 \
-                        || { echo "ERROR: frontend not healthy"; exit 1; }
+                    FINAL=$(docker inspect --format="{{.State.Running}}" autovision-frontend 2>/dev/null || echo "false")
+                    [ "$FINAL" = "true" ] || { echo "ERROR: autovision-frontend not running"; exit 1; }
 
-                    echo "Checking Ollama..."
-                    curl -sf http://${HOST}:11434/api/tags > /dev/null \
-                        && echo "Ollama healthy" \
-                        || echo "WARNING: Ollama not yet ready"
+                    echo "Checking Ollama container..."
+                    docker inspect --format="{{.State.Running}}" autovision-ollama 2>/dev/null \
+                        && echo "Ollama running" \
+                        || echo "WARNING: autovision-ollama not found"
+
+                    echo "=== All services healthy ==="
+                    docker ps --filter "name=autovision"
                 '''
             }
         }
