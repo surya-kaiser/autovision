@@ -86,18 +86,23 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                    docker run --rm \
+                    # Run WITHOUT --rm so we can docker cp results after
+                    docker run \
                         --name autovision-test-${BUILD_NUMBER} \
-                        -v "$(pwd)/backend/tests:/app/tests:ro" \
                         -e PYTHONPATH=/app \
                         "${PROJECT_NAME}:backend-latest" \
-                        sh -c "pip install --quiet pytest pytest-cov pytest-asyncio httpx && \
+                        sh -c "cd /app && \
+                               pip install --quiet pytest pytest-cov pytest-asyncio httpx && \
                                pytest tests/ -v --tb=short \
-                                   --junit-xml=/tmp/test-results.xml \
-                                   --cov=app --cov-report=xml:/tmp/coverage.xml && \
-                               cp /tmp/test-results.xml /app/test-results.xml && \
-                               cp /tmp/coverage.xml /app/coverage.xml"
-                    docker cp "$(docker ps -aqf name=autovision-test-${BUILD_NUMBER} 2>/dev/null || echo none):/app/test-results.xml" backend/test-results.xml 2>/dev/null || true
+                                   --junit-xml=test-results.xml \
+                                   --cov=app --cov-report=xml:coverage.xml"
+                    TEST_EXIT=$?
+
+                    # Copy results out before removing container
+                    docker cp autovision-test-${BUILD_NUMBER}:/app/test-results.xml backend/test-results.xml 2>/dev/null || true
+                    docker rm autovision-test-${BUILD_NUMBER} || true
+
+                    exit $TEST_EXIT
                 '''
             }
             post {
