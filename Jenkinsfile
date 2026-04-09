@@ -83,28 +83,40 @@ pipeline {
         }
 
         // ── Stage 4: Test (runs inside the backend image) ────────────────────
+        // NOTE: No -v mounts — Jenkins runs inside Docker and $(pwd) is a container
+        // path the host daemon cannot resolve. Use docker cp instead.
         stage('Test') {
             steps {
                 sh '''
-                    # Run WITHOUT --rm so we can docker cp results after
-                    # Mount tests + conftest from workspace (handles cached images without tests/)
-                    docker run \
+                    # 1. Start container in background (no --rm)
+                    docker run -d \
                         --name autovision-test-${BUILD_NUMBER} \
                         -e PYTHONPATH=/app \
-                        -v "$(pwd)/backend/tests:/app/tests" \
                         "${PROJECT_NAME}:backend-latest" \
+                        tail -f /dev/null
+
+                    # 2. Copy tests from Jenkins workspace INTO the container
+                    docker cp backend/tests/. autovision-test-${BUILD_NUMBER}:/app/tests/
+
+                    # 3. Run pytest inside the container
+                    docker exec autovision-test-${BUILD_NUMBER} \
                         sh -c "cd /app && \
                                pip install --quiet pytest pytest-cov pytest-asyncio httpx && \
                                pytest tests/ -v --tb=short \
                                    --junit-xml=/app/test-results.xml \
-                                   --cov=app --cov-report=xml:/app/coverage.xml \
-                               || true"
+                                   --cov=app --cov-report=xml:/app/coverage.xml"
+                    TEST_EXIT=$?
 
-                    # Copy results out before removing container
-                    docker cp autovision-test-${BUILD_NUMBER}:/app/test-results.xml backend/test-results.xml 2>/dev/null \
+                    # 4. Copy results back to Jenkins workspace
+                    docker cp autovision-test-${BUILD_NUMBER}:/app/test-results.xml backend/test-results.xml \
                         && echo "Test results copied" \
-                        || echo "WARNING: no test-results.xml found"
+                        || echo "WARNING: no test-results.xml"
+
+                    # 5. Cleanup
+                    docker stop autovision-test-${BUILD_NUMBER} || true
                     docker rm autovision-test-${BUILD_NUMBER} || true
+
+                    exit $TEST_EXIT
                 '''
             }
             post {
