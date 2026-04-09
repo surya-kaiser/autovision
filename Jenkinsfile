@@ -70,6 +70,10 @@ pipeline {
                 stage('Python venv') {
                     steps {
                         sh '''
+                            if ! command -v python3 &> /dev/null; then
+                                echo "Installing Python3..."
+                                apt-get update && apt-get install -y python3 python3-venv python3-pip
+                            fi
                             python3 --version
                             python3 -m venv backend/.venv
                             . backend/.venv/bin/activate
@@ -80,6 +84,11 @@ pipeline {
                 stage('Node check') {
                     steps {
                         sh '''
+                            if ! command -v node &> /dev/null; then
+                                echo "Installing Node.js..."
+                                curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                                apt-get install -y nodejs npm
+                            fi
                             node --version
                             npm  --version
                         '''
