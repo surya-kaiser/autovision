@@ -166,35 +166,39 @@ pipeline {
         }
 
         // ── Stage 7: Health Check ─────────────────────────────────────────────
+        // Jenkins runs inside Docker — localhost doesn't reach host-mapped ports.
+        // Use host.docker.internal (Windows/Mac Docker Desktop always provides this).
         stage('Health Check') {
             steps {
                 sh '''
-                    echo "Waiting for backend..."
+                    HOST=host.docker.internal
+
+                    echo "Waiting for backend at http://${HOST}:8000 ..."
                     for i in $(seq 1 12); do
-                        if curl -sf http://localhost:8000/api/v1/system/info > /dev/null 2>&1; then
+                        if curl -sf http://${HOST}:8000/api/v1/system/info > /dev/null 2>&1; then
                             echo "Backend healthy after attempt $i"
                             break
                         fi
                         echo "  attempt $i/12 — sleeping 5s"
                         sleep 5
                     done
-                    curl -sf http://localhost:8000/api/v1/system/info \
+                    curl -sf http://${HOST}:8000/api/v1/system/info \
                         || { echo "ERROR: backend not healthy"; exit 1; }
 
-                    echo "Waiting for frontend..."
+                    echo "Waiting for frontend at http://${HOST}:5173 ..."
                     for i in $(seq 1 6); do
-                        if curl -sf http://localhost:5173 > /dev/null 2>&1; then
+                        if curl -sf http://${HOST}:5173 > /dev/null 2>&1; then
                             echo "Frontend healthy after attempt $i"
                             break
                         fi
                         echo "  attempt $i/6 — sleeping 5s"
                         sleep 5
                     done
-                    curl -sf http://localhost:5173 \
+                    curl -sf http://${HOST}:5173 \
                         || { echo "ERROR: frontend not healthy"; exit 1; }
 
                     echo "Checking Ollama..."
-                    curl -sf http://localhost:11434/api/tags > /dev/null \
+                    curl -sf http://${HOST}:11434/api/tags > /dev/null \
                         && echo "Ollama healthy" \
                         || echo "WARNING: Ollama not yet ready"
                 '''
@@ -204,7 +208,14 @@ pipeline {
 
     post {
         always {
-            sh 'docker compose -p autovision logs --no-color > docker-compose.log 2>&1 || true'
+            // Clean up any leftover build containers from this run
+            sh '''
+                docker stop autovision-test-${BUILD_NUMBER} 2>/dev/null || true
+                docker rm  autovision-test-${BUILD_NUMBER} 2>/dev/null || true
+                docker stop autovision-lint-${BUILD_NUMBER} 2>/dev/null || true
+                docker rm  autovision-lint-${BUILD_NUMBER} 2>/dev/null || true
+                docker compose -p autovision logs --no-color > docker-compose.log 2>&1 || true
+            '''
             archiveArtifacts artifacts: 'docker-compose.log', allowEmptyArchive: true
         }
         success {
