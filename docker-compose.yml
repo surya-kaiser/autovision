@@ -1,0 +1,119 @@
+# AutoVision MLOps — Docker Compose Orchestration
+# =========================================================
+# Services:
+#   - backend: FastAPI (port 8000)
+#   - frontend: React + Nginx (port 5173 or 80 for prod)
+#   - ollama: LLM service (port 11434)
+# 
+# Volumes:
+#   - autovision_data: Trained models and uploads
+#   - ollama_data: LLM cache and models
+#
+# Networks:
+#   - autovision: All services communicate on this network
+# =========================================================
+
+services:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Backend: FastAPI MLOps Engine
+  # ──────────────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: autovision-backend
+    image: autovision:backend-latest
+    ports:
+      - "8000:8000"
+    environment:
+      # Ollama connection (internal Docker network)
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.2
+      # Python environment
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      # Persist trained models and uploads
+      - autovision_data:/tmp/autovision
+    networks:
+      - autovision
+    depends_on:
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/system/info"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Frontend: React Application (Vite) + Nginx
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: autovision-frontend
+    image: autovision:frontend-latest
+    ports:
+      - "5173:80"
+    environment:
+      # API backend URL (internal Docker network)
+      VITE_API_URL: http://backend:8000/api/v1
+    networks:
+      - autovision
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Ollama: LLM Service (llama3.2 model)
+  # ──────────────────────────────────────────────────────────────────────────
+  # NOTE: If Ollama is running on the host machine, comment this out and set
+  # OLLAMA_BASE_URL=http://host.docker.internal:11434 (Mac/Windows) or
+  # OLLAMA_BASE_URL=http://<host-machine-ip>:11434 (Linux)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: autovision-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persist LLM models and cache
+      - ollama_data:/root/.ollama
+    networks:
+      - autovision
+    restart: unless-stopped
+    # Environment for GPU support (optional)
+    # Comment out for CPU-only
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+# ────────────────────────────────────────────────────────────────────────────
+# Networks
+# ────────────────────────────────────────────────────────────────────────────
+networks:
+  autovision:
+    driver: bridge
+
+# ────────────────────────────────────────────────────────────────────────────
+# Volumes (persistent data storage)
+# ────────────────────────────────────────────────────────────────────────────
+volumes:
+  autovision_data:
+    driver: local
+  ollama_data:
+    driver: local

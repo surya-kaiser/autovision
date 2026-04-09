@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tests and coverage
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+test-results.xml
+*.log
+
+# Dev tools
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Data directories (mounted via volumes)
+uploads/
+models/
+logs/
+/tmp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docs
+*.md
+docs/

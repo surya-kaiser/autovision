@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.npm/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data & models (large files)
+backend/uploads/
+backend/models/
+backend/logs/
+backend/experiments/
+/tmp/
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+backend/test-results.xml
+backend/coverage/

@@ -1,0 +1,44 @@
+# Web framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+websockets==12.0
+
+# Settings
+pydantic==2.7.1
+pydantic-settings==2.3.0
+
+# Data & ML
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.4.2
+scipy==1.13.0
+
+# Gradient boosting (optional — gracefully skipped if missing)
+xgboost==2.0.3
+lightgbm==4.3.0
+
+# Image processing
+Pillow==10.3.0
+
+# YAML
+PyYAML==6.0.1
+
+# HTTP (for Ollama)
+requests==2.32.2
+
+# System info
+psutil==5.9.8
+
+# Deep learning (PyTorch)
+# NOTE: DO NOT install from this file — the Dockerfile installs the CPU-only wheel
+# explicitly from https://download.pytorch.org/whl/cpu to avoid pulling 1 GB+ CUDA libs.
+# For local dev: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Object detection / segmentation (YOLO)
+ultralytics>=8.0.0
+
+# Testing
+pytest==8.2.1
+pytest-asyncio==0.23.7
+httpx==0.27.0
