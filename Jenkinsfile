@@ -70,9 +70,19 @@ pipeline {
                 stage('Python venv') {
                     steps {
                         sh '''
-                            if ! command -v python3 &> /dev/null; then
+                            if ! command -v python3 >/dev/null 2>&1; then
+                                if [ "$(id -u)" -eq 0 ]; then
+                                    SUDO=
+                                elif command -v sudo >/dev/null 2>&1; then
+                                    SUDO=sudo
+                                else
+                                    echo "ERROR: Python3 is missing and this agent cannot install packages."
+                                    echo "Install Python 3.11+ on the Jenkins node or use an agent with Python already installed."
+                                    exit 1
+                                fi
                                 echo "Installing Python3..."
-                                apt-get update && apt-get install -y python3 python3-venv python3-pip
+                                $SUDO apt-get update
+                                $SUDO apt-get install -y python3 python3-venv python3-pip
                             fi
                             python3 --version
                             python3 -m venv backend/.venv
@@ -84,13 +94,23 @@ pipeline {
                 stage('Node check') {
                     steps {
                         sh '''
-                            if ! command -v node &> /dev/null; then
+                            if ! command -v node >/dev/null 2>&1; then
+                                if [ "$(id -u)" -eq 0 ]; then
+                                    SUDO=
+                                elif command -v sudo >/dev/null 2>&1; then
+                                    SUDO=sudo
+                                else
+                                    echo "ERROR: Node.js is missing and this agent cannot install packages."
+                                    echo "Install Node.js 20+ on the Jenkins node or use an agent with Node already installed."
+                                    exit 1
+                                fi
                                 echo "Installing Node.js..."
-                                curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-                                apt-get install -y nodejs npm
+                                $SUDO apt-get update
+                                curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO bash -
+                                $SUDO apt-get install -y nodejs npm
                             fi
                             node --version
-                            npm  --version
+                            npm --version
                         '''
                     }
                 }
